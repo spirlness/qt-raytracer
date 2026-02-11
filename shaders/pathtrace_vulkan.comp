@@ -1,0 +1,115 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(binding = 0, rgba32f) uniform image2D accumImage;
+layout(binding = 1, rgba8) uniform image2D outImage;
+
+layout(push_constant) uniform Push {
+    int width;
+    int height;
+    int frameIndex;
+    int maxDepth;
+} pc;
+
+uint hash(uint x) {
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+float rand01(inout uint state) {
+    state = hash(state);
+    return float(state) / 4294967295.0;
+}
+
+vec3 randomInUnitSphere(inout uint state) {
+    while (true) {
+        vec3 p = vec3(rand01(state), rand01(state), rand01(state)) * 2.0 - 1.0;
+        if (dot(p, p) < 1.0) {
+            return p;
+        }
+    }
+}
+
+bool hitSphere(vec3 center, float radius, vec3 ro, vec3 rd, out float t, out vec3 normal, out vec3 albedo) {
+    vec3 oc = ro - center;
+    float a = dot(rd, rd);
+    float b = dot(oc, rd);
+    float c = dot(oc, oc) - radius * radius;
+    float d = b * b - a * c;
+    if (d < 0.0) return false;
+    float s = sqrt(d);
+    float t0 = (-b - s) / a;
+    float t1 = (-b + s) / a;
+    t = t0 > 0.001 ? t0 : t1;
+    if (t <= 0.001) return false;
+    vec3 p = ro + t * rd;
+    normal = normalize(p - center);
+    if (radius > 50.0) albedo = vec3(0.8, 0.8, 0.0);
+    else if (center.x < -0.5) albedo = vec3(0.8, 0.3, 0.3);
+    else if (center.x > 0.5) albedo = vec3(0.3, 0.8, 0.3);
+    else albedo = vec3(0.75);
+    return true;
+}
+
+vec3 traceRay(vec3 ro, vec3 rd, inout uint state, int maxDepth) {
+    vec3 throughput = vec3(1.0);
+    vec3 radiance = vec3(0.0);
+    for (int depth = 0; depth < maxDepth; ++depth) {
+        float bestT = 1e20;
+        vec3 bestN = vec3(0.0);
+        vec3 bestAlbedo = vec3(0.0);
+        bool hit = false;
+
+        float t;
+        vec3 n;
+        vec3 a;
+        if (hitSphere(vec3(0.0, -100.5, -1.0), 100.0, ro, rd, t, n, a) && t < bestT) { bestT = t; bestN = n; bestAlbedo = a; hit = true; }
+        if (hitSphere(vec3(0.0, 0.0, -1.0), 0.5, ro, rd, t, n, a) && t < bestT) { bestT = t; bestN = n; bestAlbedo = a; hit = true; }
+        if (hitSphere(vec3(-1.0, 0.0, -1.4), 0.5, ro, rd, t, n, a) && t < bestT) { bestT = t; bestN = n; bestAlbedo = a; hit = true; }
+        if (hitSphere(vec3(1.0, 0.0, -1.2), 0.5, ro, rd, t, n, a) && t < bestT) { bestT = t; bestN = n; bestAlbedo = a; hit = true; }
+
+        if (!hit) {
+            vec3 unit = normalize(rd);
+            float k = 0.5 * (unit.y + 1.0);
+            vec3 sky = mix(vec3(1.0), vec3(0.5, 0.7, 1.0), k);
+            radiance += throughput * sky;
+            break;
+        }
+
+        vec3 hitPos = ro + bestT * rd;
+        vec3 scatterDir = normalize(bestN + randomInUnitSphere(state));
+        ro = hitPos + bestN * 0.001;
+        rd = scatterDir;
+        throughput *= bestAlbedo;
+    }
+    return radiance;
+}
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (p.x >= pc.width || p.y >= pc.height) return;
+
+    uint seed = uint((p.x + p.y * pc.width) * 9781 + (pc.frameIndex + 1) * 6271);
+    float u = (float(p.x) + rand01(seed)) / float(max(1, pc.width - 1));
+    float v = (float(p.y) + rand01(seed)) / float(max(1, pc.height - 1));
+
+    float aspect = float(pc.width) / float(pc.height);
+    vec3 origin = vec3(0.0, 0.3, 1.2);
+    vec3 lowerLeft = vec3(-aspect, -1.0, -1.0);
+    vec3 horizontal = vec3(2.0 * aspect, 0.0, 0.0);
+    vec3 vertical = vec3(0.0, 2.0, 0.0);
+    vec3 rd = normalize(lowerLeft + u * horizontal + v * vertical - origin);
+
+    vec3 sampleColor = traceRay(origin, rd, seed, pc.maxDepth);
+    vec4 prev = imageLoad(accumImage, p);
+    float frameCount = float(pc.frameIndex + 1);
+    vec3 accum = (prev.rgb * float(pc.frameIndex) + sampleColor) / frameCount;
+    imageStore(accumImage, p, vec4(accum, 1.0));
+
+    vec3 mapped = sqrt(clamp(accum, vec3(0.0), vec3(1.0)));
+    imageStore(outImage, p, vec4(mapped, 1.0));
+}

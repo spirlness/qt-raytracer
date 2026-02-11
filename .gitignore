@@ -1,0 +1,53 @@
+# Build directories
+build/
+cmake-build-*/
+
+# CMake generated
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+compile_commands.json
+
+# Tool outputs
+cmake_output.txt
+compile_flags.txt
+
+# Compiled binaries / objects
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.pdb
+*.ilk
+
+# Shader artifacts
+*.spv
+
+# IDEs/editors
+.vs/
+.vscode/
+.idea/
+
+# Local AI tooling
+.claude/
+*.user
+*.user.*
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Python caches (tools/scripts)
+__pycache__/
+*.pyc
+.ruff_cache/
