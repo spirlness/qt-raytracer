@@ -10,6 +10,65 @@ option(BUILD_APP "Build the Qt application target" ON)
 option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_CUDA "Enable CUDA path tracing backend" OFF)
 option(ENABLE_VULKAN_COMPUTE "Enable Vulkan compute path tracing backend" ON)
+option(ENABLE_MAX_RELEASE_OPTIMIZATION "Enable aggressive optimization for Release builds" ON)
+option(ENABLE_NATIVE_ARCH "Tune Release build for current CPU" OFF)
+
+function(apply_release_optimizations target_name)
+    if(NOT ENABLE_MAX_RELEASE_OPTIMIZATION)
+        return()
+    endif()
+
+    if(MSVC)
+        target_compile_options(${target_name} PRIVATE
+            $<$<CONFIG:Release>:/O2>
+            $<$<CONFIG:Release>:/GL>
+            $<$<CONFIG:Release>:/Gw>
+            $<$<CONFIG:Release>:/Gy>
+            $<$<CONFIG:Release>:/Oi>
+            $<$<CONFIG:Release>:/Ot>
+            $<$<CONFIG:Release>:/Ob3>
+            $<$<CONFIG:Release>:/fp:fast>
+        )
+        target_link_options(${target_name} PRIVATE
+            $<$<CONFIG:Release>:/LTCG>
+            $<$<CONFIG:Release>:/OPT:REF>
+            $<$<CONFIG:Release>:/OPT:ICF>
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target_name} PRIVATE
+            $<$<CONFIG:Release>:-O3>
+            $<$<CONFIG:Release>:-ffast-math>
+            $<$<CONFIG:Release>:-fno-math-errno>
+            $<$<CONFIG:Release>:-fstrict-aliasing>
+            $<$<CONFIG:Release>:-fomit-frame-pointer>
+            $<$<CONFIG:Release>:-ffunction-sections>
+            $<$<CONFIG:Release>:-fdata-sections>
+        )
+        target_link_options(${target_name} PRIVATE
+            $<$<CONFIG:Release>:-Wl,--gc-sections>
+        )
+
+        if(ENABLE_NATIVE_ARCH)
+            target_compile_options(${target_name} PRIVATE
+                $<$<CONFIG:Release>:-march=native>
+                $<$<CONFIG:Release>:-mtune=native>
+            )
+        endif()
+    endif()
+
+    if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        message(STATUS "Skipping IPO/LTO for ${target_name} on Windows+Clang toolchain")
+        set_property(TARGET ${target_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE)
+    else()
+        include(CheckIPOSupported)
+        check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+        if(ipo_supported)
+            set_property(TARGET ${target_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+        else()
+            message(STATUS "IPO/LTO unavailable for ${target_name}: ${ipo_error}")
+        endif()
+    endif()
+endfunction()
 
 if(BUILD_APP)
     if(ENABLE_CUDA)
@@ -97,6 +156,7 @@ qt_add_resources(raytracer_app "qml_resources"
 )
 
 target_link_libraries(raytracer_app Qt6::Quick Qt6::OpenGL)
+apply_release_optimizations(raytracer_app)
 
 if(WIN32)
     get_filename_component(TOOLCHAIN_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
