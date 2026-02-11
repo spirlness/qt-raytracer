@@ -199,6 +199,17 @@ extern "C" bool cudaPathTracerInit(int width, int height, const char **errorMess
     gState.height = height;
     gState.hostOutput.assign(static_cast<size_t>(width) * static_cast<size_t>(height), 0u);
 
+    auto cleanupAllocations = []() {
+        if (gState.dAccum) {
+            cudaFree(gState.dAccum);
+            gState.dAccum = nullptr;
+        }
+        if (gState.dOutput) {
+            cudaFree(gState.dOutput);
+            gState.dOutput = nullptr;
+        }
+    };
+
     cudaError_t err = cudaMalloc(reinterpret_cast<void **>(&gState.dAccum), static_cast<size_t>(width) * static_cast<size_t>(height) * 4 * sizeof(float));
     if (err != cudaSuccess) {
         setError(cudaGetErrorString(err));
@@ -208,6 +219,7 @@ extern "C" bool cudaPathTracerInit(int width, int height, const char **errorMess
 
     err = cudaMalloc(reinterpret_cast<void **>(&gState.dOutput), static_cast<size_t>(width) * static_cast<size_t>(height) * sizeof(unsigned int));
     if (err != cudaSuccess) {
+        cleanupAllocations();
         setError(cudaGetErrorString(err));
         if (errorMessage) *errorMessage = gState.error;
         return false;
@@ -215,6 +227,7 @@ extern "C" bool cudaPathTracerInit(int width, int height, const char **errorMess
 
     err = cudaMemset(gState.dAccum, 0, static_cast<size_t>(width) * static_cast<size_t>(height) * 4 * sizeof(float));
     if (err != cudaSuccess) {
+        cleanupAllocations();
         setError(cudaGetErrorString(err));
         if (errorMessage) *errorMessage = gState.error;
         return false;

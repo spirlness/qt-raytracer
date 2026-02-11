@@ -40,6 +40,14 @@ struct VulkanPathTracer::Impl {
 
     VkShaderModule shaderModule = VK_NULL_HANDLE;
 };
+
+static bool checkVkResult(VkResult result, const char *callName, QString &errorOut) {
+    if (result == VK_SUCCESS) {
+        return true;
+    }
+    errorOut = QString("%1 failed (VkResult=%2)").arg(QString::fromLatin1(callName)).arg(static_cast<int>(result));
+    return false;
+}
 #endif
 
 VulkanPathTracer::VulkanPathTracer() {
@@ -90,7 +98,9 @@ bool VulkanPathTracer::renderFrame(int maxDepth) {
     vkResetCommandBuffer(m_impl->commandBuffer, 0);
 
     VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-    vkBeginCommandBuffer(m_impl->commandBuffer, &beginInfo);
+    if (!checkVkResult(vkBeginCommandBuffer(m_impl->commandBuffer, &beginInfo), "vkBeginCommandBuffer", m_lastError)) {
+        return false;
+    }
 
     VkImageMemoryBarrier toGeneral[2] = {};
     for (int i = 0; i < 2; ++i) {
@@ -225,13 +235,19 @@ bool VulkanPathTracer::renderFrame(int maxDepth) {
         0,
         nullptr);
 
-    vkEndCommandBuffer(m_impl->commandBuffer);
+    if (!checkVkResult(vkEndCommandBuffer(m_impl->commandBuffer), "vkEndCommandBuffer", m_lastError)) {
+        return false;
+    }
 
     VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &m_impl->commandBuffer;
-    vkQueueSubmit(m_impl->queue, 1, &submitInfo, m_impl->fence);
-    vkWaitForFences(m_impl->device, 1, &m_impl->fence, VK_TRUE, UINT64_MAX);
+    if (!checkVkResult(vkQueueSubmit(m_impl->queue, 1, &submitInfo, m_impl->fence), "vkQueueSubmit", m_lastError)) {
+        return false;
+    }
+    if (!checkVkResult(vkWaitForFences(m_impl->device, 1, &m_impl->fence, VK_TRUE, UINT64_MAX), "vkWaitForFences", m_lastError)) {
+        return false;
+    }
 
     std::memcpy(
         m_hostOutput.data(),
@@ -522,23 +538,31 @@ bool VulkanPathTracer::createImagesAndBuffers() {
     VkCommandPoolCreateInfo cpInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     cpInfo.queueFamilyIndex = m_impl->queueFamilyIndex;
     cpInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    vkCreateCommandPool(m_impl->device, &cpInfo, nullptr, &m_impl->commandPool);
+    if (!checkVkResult(vkCreateCommandPool(m_impl->device, &cpInfo, nullptr, &m_impl->commandPool), "vkCreateCommandPool", m_lastError)) {
+        return false;
+    }
 
     VkCommandBufferAllocateInfo cbAlloc{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     cbAlloc.commandPool = m_impl->commandPool;
     cbAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cbAlloc.commandBufferCount = 1;
-    vkAllocateCommandBuffers(m_impl->device, &cbAlloc, &m_impl->commandBuffer);
+    if (!checkVkResult(vkAllocateCommandBuffers(m_impl->device, &cbAlloc, &m_impl->commandBuffer), "vkAllocateCommandBuffers", m_lastError)) {
+        return false;
+    }
 
     VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-    vkCreateFence(m_impl->device, &fenceInfo, nullptr, &m_impl->fence);
+    if (!checkVkResult(vkCreateFence(m_impl->device, &fenceInfo, nullptr, &m_impl->fence), "vkCreateFence", m_lastError)) {
+        return false;
+    }
 
     const VkDeviceSize stagingSize = static_cast<VkDeviceSize>(m_width) * static_cast<VkDeviceSize>(m_height) * 4u;
     VkBufferCreateInfo bufInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     bufInfo.size = stagingSize;
     bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    vkCreateBuffer(m_impl->device, &bufInfo, nullptr, &m_impl->stagingBuffer);
+    if (!checkVkResult(vkCreateBuffer(m_impl->device, &bufInfo, nullptr, &m_impl->stagingBuffer), "vkCreateBuffer", m_lastError)) {
+        return false;
+    }
 
     VkMemoryRequirements bufReq;
     vkGetBufferMemoryRequirements(m_impl->device, m_impl->stagingBuffer, &bufReq);
@@ -552,15 +576,21 @@ bool VulkanPathTracer::createImagesAndBuffers() {
         m_lastError = QStringLiteral("vkAllocateMemory(staging) failed");
         return false;
     }
-    vkBindBufferMemory(m_impl->device, m_impl->stagingBuffer, m_impl->stagingMemory, 0);
-    vkMapMemory(m_impl->device, m_impl->stagingMemory, 0, VK_WHOLE_SIZE, 0, &m_impl->stagingMapped);
+    if (!checkVkResult(vkBindBufferMemory(m_impl->device, m_impl->stagingBuffer, m_impl->stagingMemory, 0), "vkBindBufferMemory", m_lastError)) {
+        return false;
+    }
+    if (!checkVkResult(vkMapMemory(m_impl->device, m_impl->stagingMemory, 0, VK_WHOLE_SIZE, 0, &m_impl->stagingMapped), "vkMapMemory", m_lastError)) {
+        return false;
+    }
 
     return true;
 }
 
 bool VulkanPathTracer::recordAndSubmitInitClear() {
     VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-    vkBeginCommandBuffer(m_impl->commandBuffer, &begin);
+    if (!checkVkResult(vkBeginCommandBuffer(m_impl->commandBuffer, &begin), "vkBeginCommandBuffer", m_lastError)) {
+        return false;
+    }
 
     VkImageMemoryBarrier toGeneral[2] = {};
     for (int i = 0; i < 2; ++i) {
@@ -606,13 +636,19 @@ bool VulkanPathTracer::recordAndSubmitInitClear() {
         1,
         &toGeneral[1].subresourceRange);
 
-    vkEndCommandBuffer(m_impl->commandBuffer);
+    if (!checkVkResult(vkEndCommandBuffer(m_impl->commandBuffer), "vkEndCommandBuffer", m_lastError)) {
+        return false;
+    }
 
     VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &m_impl->commandBuffer;
-    vkQueueSubmit(m_impl->queue, 1, &submit, m_impl->fence);
-    vkWaitForFences(m_impl->device, 1, &m_impl->fence, VK_TRUE, UINT64_MAX);
+    if (!checkVkResult(vkQueueSubmit(m_impl->queue, 1, &submit, m_impl->fence), "vkQueueSubmit", m_lastError)) {
+        return false;
+    }
+    if (!checkVkResult(vkWaitForFences(m_impl->device, 1, &m_impl->fence, VK_TRUE, UINT64_MAX), "vkWaitForFences", m_lastError)) {
+        return false;
+    }
     vkResetFences(m_impl->device, 1, &m_impl->fence);
     vkResetCommandBuffer(m_impl->commandBuffer, 0);
 
