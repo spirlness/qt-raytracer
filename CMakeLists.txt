@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
-project(Qt-CMake-HelloWorld)
+project(qt_raytracer LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ENABLE_CUDA "Enable CUDA path tracing backend" OFF)
 option(ENABLE_VULKAN_COMPUTE "Enable Vulkan compute path tracing backend" ON)
@@ -20,31 +21,41 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-add_executable(helloworld
-    main.cpp
-    GpuPathTracer.cpp GpuPathTracer.h
-    CudaPathTracer.cpp CudaPathTracer.h
-    VulkanPathTracer.cpp VulkanPathTracer.h
-    RayTracer.h
-    RayTracerFboItem.cpp RayTracerFboItem.h
+add_executable(raytracer_app
+    include/raytracer/RayTracer.h
+    src/app/main.cpp
+    src/app/RayTracerFboItem.cpp
+    src/app/RayTracerFboItem.h
+    src/backends/GpuPathTracer.cpp
+    src/backends/GpuPathTracer.h
+    src/backends/CudaPathTracer.cpp
+    src/backends/CudaPathTracer.h
+    src/backends/vulkan/VulkanPathTracer.cpp
+    src/backends/vulkan/VulkanPathTracer.h
+    src/backends/vulkan/VulkanPathTracerSpv.h
+)
+
+target_include_directories(raytracer_app PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 if(ENABLE_CUDA)
-    target_sources(helloworld PRIVATE CudaPathTracerKernel.cu)
-    target_compile_definitions(helloworld PRIVATE ENABLE_CUDA_BACKEND=1)
-    set_target_properties(helloworld PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    target_sources(raytracer_app PRIVATE src/backends/CudaPathTracerKernel.cu)
+    target_compile_definitions(raytracer_app PRIVATE ENABLE_CUDA_BACKEND=1)
+    set_target_properties(raytracer_app PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 endif()
 
 if(ENABLE_VULKAN_COMPUTE)
     find_package(Vulkan QUIET)
     if(Vulkan_FOUND)
-        target_compile_definitions(helloworld PRIVATE ENABLE_VULKAN_COMPUTE=1)
-        target_link_libraries(helloworld Vulkan::Vulkan)
+        target_compile_definitions(raytracer_app PRIVATE ENABLE_VULKAN_COMPUTE=1)
+        target_link_libraries(raytracer_app Vulkan::Vulkan)
 
-        set(VULKAN_COMPUTE_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/shaders/pathtrace_vulkan.comp")
+        set(VULKAN_COMPUTE_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/pathtrace_vulkan.comp")
         set(VULKAN_COMPUTE_SPV "${CMAKE_CURRENT_BINARY_DIR}/pathtrace_vulkan.comp.spv")
-        set(VULKAN_COMPUTE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/VulkanPathTracerSpv.h")
-        set(SPV_TO_HEADER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/spv_to_header.py")
+        set(VULKAN_COMPUTE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/vulkan/VulkanPathTracerSpv.h")
+        set(SPV_TO_HEADER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/tools/spv_to_header.py")
 
         find_program(GLSLANG_VALIDATOR_EXECUTABLE glslangValidator
             HINTS
@@ -76,23 +87,23 @@ if(ENABLE_VULKAN_COMPUTE)
     endif()
 endif()
 
-qt_add_resources(helloworld "qml_resources"
+qt_add_resources(raytracer_app "qml_resources"
     PREFIX "/"
     FILES
-        qml/BlurLayer.qml
-        qml/Main.qml
+        resources/qml/BlurLayer.qml
+        resources/qml/Main.qml
 )
 
-target_link_libraries(helloworld Qt6::Quick Qt6::OpenGL)
+target_link_libraries(raytracer_app Qt6::Quick Qt6::OpenGL)
 
 if(WIN32)
     get_filename_component(TOOLCHAIN_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${TOOLCHAIN_BIN_DIR}")
 
     if(WINDEPLOYQT_EXECUTABLE)
-        add_custom_command(TARGET helloworld POST_BUILD
-            COMMAND "${WINDEPLOYQT_EXECUTABLE}" --release "$<TARGET_FILE:helloworld>"
-            COMMENT "Deploying Qt runtime for helloworld"
+        add_custom_command(TARGET raytracer_app POST_BUILD
+            COMMAND "${WINDEPLOYQT_EXECUTABLE}" --release "$<TARGET_FILE:raytracer_app>"
+            COMMENT "Deploying Qt runtime for raytracer_app"
         )
     endif()
 
@@ -112,10 +123,10 @@ if(WIN32)
     foreach(RUNTIME_DLL IN LISTS MINGW_RUNTIME_DLLS)
         set(RUNTIME_DLL_PATH "${TOOLCHAIN_BIN_DIR}/${RUNTIME_DLL}")
         if(EXISTS "${RUNTIME_DLL_PATH}")
-            add_custom_command(TARGET helloworld POST_BUILD
+            add_custom_command(TARGET raytracer_app POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${RUNTIME_DLL_PATH}"
-                    "$<TARGET_FILE_DIR:helloworld>"
+                    "$<TARGET_FILE_DIR:raytracer_app>"
                 COMMENT "Copying ${RUNTIME_DLL}"
             )
         endif()
@@ -143,7 +154,8 @@ add_executable(raytracer_tests
 )
 
 target_include_directories(raytracer_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
 )
 
 target_link_libraries(raytracer_tests PRIVATE gtest_main)

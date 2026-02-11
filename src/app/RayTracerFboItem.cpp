@@ -1,7 +1,8 @@
-#include "RayTracerFboItem.h"
-#include "CudaPathTracer.h"
-#include "GpuPathTracer.h"
-#include "VulkanPathTracer.h"
+#include "app/RayTracerFboItem.h"
+#include "backends/CudaPathTracer.h"
+#include "backends/GpuPathTracer.h"
+#include "backends/vulkan/VulkanPathTracer.h"
+#include "raytracer/RayTracer.h"
 
 #include <QMutexLocker>
 #include <QMetaObject>

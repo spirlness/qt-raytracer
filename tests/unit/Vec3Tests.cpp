@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "RayTracer.h"
+#include "raytracer/RayTracer.h"
 
 namespace {
 constexpr double kEpsilon = 1e-9;

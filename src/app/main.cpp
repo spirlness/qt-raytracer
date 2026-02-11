@@ -8,7 +8,7 @@
 #include <QtQuick/QQuickView>
 #include <QtQuick/QQuickWindow>
 
-#include "RayTracerFboItem.h"
+#include "app/RayTracerFboItem.h"
 
 static QSGRendererInterface::GraphicsApi parseGraphicsApi(const QString &name) {
     const QString normalized = name.trimmed().toLower();
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
     GraphicsBackendController backendController(requestedApiName);
     view.rootContext()->setContextProperty(QStringLiteral("backendController"), &backendController);
     view.setResizeMode(QQuickView::SizeRootObjectToView);
-    view.setSource(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
+    view.setSource(QUrl(QStringLiteral("qrc:/resources/qml/Main.qml")));
     if (view.status() == QQuickView::Error) {
         return -1;
     }

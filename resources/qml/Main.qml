@@ -102,7 +102,7 @@ Item {
     }
 
     Component.onCompleted: {
-        var c = Qt.createComponent("qrc:/qml/BlurLayer.qml")
+        var c = Qt.createComponent("qrc:/resources/qml/BlurLayer.qml")
         effectsAvailable = c.status === Component.Ready
     }
 
@@ -139,7 +139,7 @@ Item {
             Loader {
                 anchors.fill: parent
                 active: root.effectsAvailable
-                source: "qrc:/qml/BlurLayer.qml"
+                source: "qrc:/resources/qml/BlurLayer.qml"
                 onLoaded: {
                     item.sourceItem = backdrop
                     item.sourceRect = Qt.binding(function() {
@@ -614,7 +614,7 @@ Item {
             Loader {
                 anchors.fill: parent
                 active: root.effectsAvailable
-                source: "qrc:/qml/BlurLayer.qml"
+                source: "qrc:/resources/qml/BlurLayer.qml"
                 onLoaded: {
                     item.sourceItem = backdrop
                     item.sourceRect = Qt.binding(function() {

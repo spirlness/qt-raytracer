@@ -11,8 +11,6 @@
 #include <atomic>
 #include <memory>
 
-#include "RayTracer.h"
-
 class RenderWorker : public QObject {
     Q_OBJECT
 public:
