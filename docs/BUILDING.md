@@ -24,13 +24,21 @@ cmake -S . -B build
 
 Common options:
 
+- `-DBUILD_APP=OFF` to skip Qt app target
+- `-DBUILD_TESTS=ON` to build unit tests
 - `-DENABLE_CUDA=ON` to build CUDA backend
 - `-DENABLE_VULKAN_COMPUTE=OFF` to disable Vulkan compute backend
 
 Example:
 
 ```bash
-cmake -S . -B build -DENABLE_CUDA=ON -DENABLE_VULKAN_COMPUTE=ON
+cmake -S . -B build -DBUILD_APP=ON -DBUILD_TESTS=ON -DENABLE_CUDA=ON -DENABLE_VULKAN_COMPUTE=ON
+```
+
+CI-oriented tests-only configure:
+
+```bash
+cmake -S . -B build -DBUILD_APP=OFF -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
 ```
 
 ## 3. Build
@@ -47,6 +55,20 @@ Test target: `raytracer_tests`
 
 ```bash
 ctest --test-dir build
+```
+
+### Coverage (Linux, lcov)
+
+```bash
+cmake -S . -B build-coverage -DBUILD_APP=OFF -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_C_FLAGS="--coverage -O0 -g" \
+  -DCMAKE_CXX_FLAGS="--coverage -O0 -g" \
+  -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+cmake --build build-coverage --target raytracer_tests
+ctest --test-dir build-coverage --output-on-failure
+lcov --capture --directory build-coverage --output-file coverage.info
+lcov --remove coverage.info '/usr/*' '*/_deps/*' '*/tests/*' '*/build-coverage/*' --output-file coverage.filtered.info
+genhtml coverage.filtered.info --output-directory coverage-html
 ```
 
 ## 5. Vulkan Shader Header Regeneration
@@ -90,6 +112,8 @@ build/raytracer_app.exe --graphics-api software
 Symptoms: configure fails in `find_package(Qt6 REQUIRED COMPONENTS Quick OpenGL)`.
 
 Action: ensure Qt installation includes Qt Quick and OpenGL components and that CMake can locate Qt.
+
+If you only need unit tests in CI, configure with `-DBUILD_APP=OFF` to avoid Qt dependency.
 
 ### Vulkan backend unavailable at runtime
 

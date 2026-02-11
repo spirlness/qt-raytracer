@@ -1,0 +1,73 @@
+name: Coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    name: Coverage (ubuntu)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install coverage tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lcov ninja-build
+
+      - name: Configure (coverage, tests-only)
+        run: >-
+          cmake -S . -B build-coverage -G Ninja
+          -DBUILD_APP=OFF
+          -DBUILD_TESTS=ON
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_FLAGS="--coverage -O0 -g"
+          -DCMAKE_CXX_FLAGS="--coverage -O0 -g"
+          -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Build unit tests
+        run: cmake --build build-coverage --target raytracer_tests
+
+      - name: Run unit tests
+        run: ctest --test-dir build-coverage --output-on-failure
+
+      - name: Capture coverage
+        run: |
+          lcov --capture --directory build-coverage --output-file coverage.info
+          lcov --remove coverage.info \
+            '/usr/*' \
+            '*/_deps/*' \
+            '*/tests/*' \
+            '*/build-coverage/*' \
+            --output-file coverage.filtered.info
+          lcov --summary coverage.filtered.info | tee coverage-summary.txt
+
+      - name: Generate HTML report
+        run: genhtml coverage.filtered.info --output-directory coverage-html
+
+      - name: Publish coverage summary
+        run: |
+          {
+            echo '## Coverage Summary'
+            echo
+            echo '```text'
+            cat coverage-summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.filtered.info
+            coverage-summary.txt
+            coverage-html/
+          if-no-files-found: error
+          retention-days: 14

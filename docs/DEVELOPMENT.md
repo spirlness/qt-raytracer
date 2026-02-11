@@ -53,6 +53,14 @@ cmake --build build
 ctest --test-dir build
 ```
 
+CI-equivalent tests-only workflow:
+
+```bash
+cmake -S . -B build-ci -DBUILD_APP=OFF -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-ci --config Release --target raytracer_tests
+ctest --test-dir build-ci -C Release --output-on-failure
+```
+
 When changing Vulkan shader source:
 
 ```bash
@@ -80,6 +88,15 @@ cmake --build build
 
 Current tests focus on CPU ray tracing math/object logic in `tests/unit/`.
 
+Expanded coverage includes:
+
+- math utilities and random sampling constraints
+- `AABB` and `surrounding_box` behavior
+- `Sphere` and `HitableList` bounding-box behavior
+- `BVHNode` hit and bounding-box behavior
+- camera ray generation and aperture offset constraints
+- material scatter invariants for Lambertian/Metal/Dielectric
+
 Recommended additions:
 
 - backend initialization tests (where feasible)
@@ -92,3 +109,15 @@ Recommended additions:
 
 - do not add new dependencies from active modules into legacy code
 - if reusing code, migrate it explicitly into `src/app` or `src/backends`
+
+## 8. GitHub Workflow
+
+Workflow files:
+
+- `.github/workflows/ci.yml`
+  - builds and runs `raytracer_tests` on Ubuntu and Windows
+  - uses `BUILD_APP=OFF` to decouple unit tests from Qt runtime packaging
+- `.github/workflows/coverage.yml`
+  - runs instrumented unit tests on Ubuntu
+  - generates `lcov` summary + HTML report
+  - uploads coverage artifacts for inspection

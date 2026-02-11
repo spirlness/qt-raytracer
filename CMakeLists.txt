@@ -6,22 +6,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(BUILD_APP "Build the Qt application target" ON)
+option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_CUDA "Enable CUDA path tracing backend" OFF)
 option(ENABLE_VULKAN_COMPUTE "Enable Vulkan compute path tracing backend" ON)
 
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+if(BUILD_APP)
+    if(ENABLE_CUDA)
+        enable_language(CUDA)
+    endif()
 
-if(ENABLE_CUDA)
-    enable_language(CUDA)
-endif()
+    find_package(Qt6 REQUIRED COMPONENTS Quick OpenGL)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick OpenGL)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTOUIC ON)
+    set(CMAKE_AUTORCC ON)
 
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTORCC ON)
-
-add_executable(raytracer_app
+    add_executable(raytracer_app
     include/raytracer/RayTracer.h
     src/app/main.cpp
     src/app/RayTracerFboItem.cpp
@@ -33,7 +34,7 @@ add_executable(raytracer_app
     src/backends/vulkan/VulkanPathTracer.cpp
     src/backends/vulkan/VulkanPathTracer.h
     src/backends/vulkan/VulkanPathTracerSpv.h
-)
+    )
 
 target_include_directories(raytracer_app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -49,6 +50,7 @@ endif()
 if(ENABLE_VULKAN_COMPUTE)
     find_package(Vulkan QUIET)
     if(Vulkan_FOUND)
+        find_package(Python3 COMPONENTS Interpreter REQUIRED)
         target_compile_definitions(raytracer_app PRIVATE ENABLE_VULKAN_COMPUTE=1)
         target_link_libraries(raytracer_app Vulkan::Vulkan)
 
@@ -133,6 +135,9 @@ if(WIN32)
     endforeach()
 endif()
 
+endif()
+
+if(BUILD_TESTS)
 enable_testing()
 include(FetchContent)
 
@@ -151,6 +156,11 @@ add_executable(raytracer_tests
     tests/unit/RayTests.cpp
     tests/unit/SphereTests.cpp
     tests/unit/HitableListTests.cpp
+    tests/unit/MathUtilsTests.cpp
+    tests/unit/AabbTests.cpp
+    tests/unit/BvhTests.cpp
+    tests/unit/CameraTests.cpp
+    tests/unit/MaterialTests.cpp
 )
 
 target_include_directories(raytracer_tests PRIVATE
@@ -162,3 +172,4 @@ target_link_libraries(raytracer_tests PRIVATE gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(raytracer_tests)
+endif()

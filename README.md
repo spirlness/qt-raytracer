@@ -85,6 +85,12 @@ cmake -S . -B build -DENABLE_CUDA=ON
 cmake -S . -B build -DENABLE_VULKAN_COMPUTE=ON
 ```
 
+- Build tests only (no Qt runtime/app target, useful for CI):
+
+```bash
+cmake -S . -B build -DBUILD_APP=OFF -DBUILD_TESTS=ON
+```
+
 ## Run
 
 On Windows, run:
@@ -114,3 +120,18 @@ cmake --build build --target regen_spv
 - Build and toolchain details: `docs/BUILDING.md`
 - Runtime and module design: `docs/ARCHITECTURE.md`
 - Coding workflow and conventions: `docs/DEVELOPMENT.md`
+
+## CI
+
+GitHub Actions workflows:
+
+- `.github/workflows/ci.yml`
+  - triggers on `push`, `pull_request`, and manual dispatch
+  - runs CMake configure/build + `ctest`
+  - executes on both `ubuntu-latest` and `windows-latest`
+  - uses tests-only configuration (`-DBUILD_APP=OFF`) for faster and more stable CI
+- `.github/workflows/coverage.yml`
+  - runs on `ubuntu-latest`
+  - builds tests with gcov instrumentation (`--coverage`)
+  - generates `lcov` summary and HTML report
+  - uploads report artifacts (`coverage.filtered.info`, `coverage-html/`)
