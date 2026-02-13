@@ -395,6 +395,10 @@ inline BVHNode::BVHNode(std::vector<std::shared_ptr<Hitable>>& src_objects, size
     auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
     const size_t object_span = end - start;
 
+    if (object_span == 0) {
+        throw std::invalid_argument("BVHNode requires at least one object.");
+    }
+
     if (object_span == 1) {
         left = right = src_objects[start];
     } else if (object_span == 2) {
