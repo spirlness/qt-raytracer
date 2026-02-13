@@ -56,3 +56,8 @@ TEST(BvhTests, MissReturnsFalse) {
 
     EXPECT_FALSE(bvh.hit(ray, 0.001, infinity, rec));
 }
+
+TEST(BvhTests, ConstructingWithEmptyRangeThrows) {
+    std::vector<std::shared_ptr<Hitable>> objects;
+    EXPECT_THROW(BVHNode bvh(objects, 0, objects.size()), std::invalid_argument);
+}
